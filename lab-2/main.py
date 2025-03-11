@@ -1,29 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
-from scipy.optimize import fsolve
 import sympy as sp
-from sympy import symbols, solve, diff, sqrt, cos, sin, ln, exp, Matrix
+from sympy import symbols, solve, diff, sqrt, cos, sin
 
 # Настраиваем параметры графиков для корректного отображения русского текста
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['font.size'] = 12
 
-# Задание 1: Конические сечения
+# Задание 1: Конические сечения (только эллипс)
 def task1():
     print("Задание 1: Конические сечения")
     
-    # a) Задаем эллипс и гиперболу полуосями a, b
+    # a) Задаем эллипс полуосями a, b
     a, b = 4, 2  # произвольные значения полуосей
     
     # Параметрические уравнения эллипса: x = a*cos(t), y = b*sin(t)
-    print("\na) Параметрические уравнения кривых:")
+    print("\na) Параметрические уравнения кривой:")
     print(f"Эллипс: x = {a}*cos(t), y = {b}*sin(t), t ∈ [0; 2π)")
     
-    # Параметрические уравнения гиперболы: x = a*cosh(t), y = b*sinh(t)
-    print(f"Гипербола: x = {a}*cosh(t), y = {b}*sinh(t), t ∈ (-∞; +∞)")
-    
-    # b) Найдем уравнения касательных к кривым в точке
+    # b) Найдем уравнения касательных к кривой в точке
     t0 = np.pi/4  # произвольное значение параметра
     x0_ellipse = a * np.cos(t0)
     y0_ellipse = b * np.sin(t0)
@@ -42,47 +38,31 @@ def task1():
         print(f"\nb) Уравнение касательной к эллипсу в точке ({x0_ellipse:.2f}, {y0_ellipse:.2f}):")
         print(f"x = {x0_ellipse:.4f}")
     
-    # Для гиперболы выбираем другой параметр
-    t0_hyp = 0.5
-    x0_hyperbola = a * np.cosh(t0_hyp)
-    y0_hyperbola = b * np.sinh(t0_hyp)
-    
-    # Производные параметрических уравнений гиперболы
-    dx_dt_hyperbola = a * np.sinh(t0_hyp)
-    dy_dt_hyperbola = b * np.cosh(t0_hyp)
-    
-    # Уравнение касательной к гиперболе
-    k_hyperbola = dy_dt_hyperbola / dx_dt_hyperbola
-    b_hyperbola = y0_hyperbola - k_hyperbola * x0_hyperbola
-    print(f"Уравнение касательной к гиперболе в точке ({x0_hyperbola:.2f}, {y0_hyperbola:.2f}):")
-    print(f"y = {k_hyperbola:.4f}*x + {b_hyperbola:.4f}")
-    
     # c) Разбиваем промежуток [0; 2π) на n участков
-    n = 8  # количество участков
+    n = 10  # количество участков
     t_points = np.linspace(0, 2*np.pi, n+1)[:-1]  # точки разбиения без последней (она совпадает с первой)
-    t_mid_points = [(t_points[i] + t_points[(i+1)%n])/2 for i in range(n)]  # середины участков
     
     print(f"\nc) Разбиение промежутка [0; 2π) на {n} участков:")
     for i in range(n):
         interval_start = t_points[i]
         interval_end = t_points[(i+1)%n]
-        mid_point = t_mid_points[i]
-        print(f"Участок {i+1}: [{interval_start:.2f}; {interval_end:.2f}], середина: {mid_point:.2f}")
+        print(f"Участок {i+1}: [{interval_start:.2f}; {interval_end:.2f}]")
     
     # d) Из отрезков касательных составим многоугольник
     # Найдем точки касания и направляющие векторы касательных
-    tangent_points_x = [a * np.cos(t) for t in t_mid_points]
-    tangent_points_y = [b * np.sin(t) for t in t_mid_points]
+    tangent_points_x = [a * np.cos(t) for t in t_points]
+    tangent_points_y = [b * np.sin(t) for t in t_points]
     
-    tangent_vectors_x = [-a * np.sin(t) for t in t_mid_points]
-    tangent_vectors_y = [b * np.cos(t) for t in t_mid_points]
+    # Вычисляем производные в каждой точке
+    dx_dt_values = [-a * np.sin(t) for t in t_points]
+    dy_dt_values = [b * np.cos(t) for t in t_points]
     
     # Функция для нахождения точки пересечения двух прямых
     def find_intersection(p1, v1, p2, v2):
         # p1, p2 - точки на прямых
         # v1, v2 - направляющие векторы прямых
         # Решаем систему уравнений: p1 + t1*v1 = p2 + t2*v2
-        A = np.array([v1, [-v for v in v2]]).T  # Negate each element in v2
+        A = np.array([v1, [-v for v in v2]]).T
         b = np.array([p2[0] - p1[0], p2[1] - p1[1]])
         try:
             t1, t2 = np.linalg.solve(A, b)
@@ -95,10 +75,10 @@ def task1():
     polygon_points = []
     for i in range(n):
         p1 = [tangent_points_x[i], tangent_points_y[i]]
-        v1 = [tangent_vectors_x[i], tangent_vectors_y[i]]
+        v1 = [dx_dt_values[i], dy_dt_values[i]]
         
         p2 = [tangent_points_x[(i+1)%n], tangent_points_y[(i+1)%n]]
-        v2 = [tangent_vectors_x[(i+1)%n], tangent_vectors_y[(i+1)%n]]
+        v2 = [dx_dt_values[(i+1)%n], dy_dt_values[(i+1)%n]]
         
         intersection = find_intersection(p1, v1, p2, v2)
         if intersection:
@@ -121,29 +101,14 @@ def task1():
     y_ellipse = b * np.sin(t)
     plt.plot(x_ellipse, y_ellipse, 'b-', linewidth=2.5, label='Эллипс')
 
-    # Рисуем гиперболу
-    t_hyp = np.linspace(-2, 2, 1000)
-    x_hyperbola = a * np.cosh(t_hyp)
-    y_hyperbola = b * np.sinh(t_hyp)
-    plt.plot(x_hyperbola, y_hyperbola, 'g-', linewidth=2.5, label='Гипербола')
-
     # Рисуем точки касания
     plt.scatter(tangent_points_x, tangent_points_y, color='red', s=80, label='Точки касания')
 
-    # Рисуем касательные с увеличенным диапазоном для лучшей видимости
-    for i in range(n):
-        # Увеличиваем длину отображаемых касательных
-        t = np.linspace(-100, 100, 2)
-        p = [tangent_points_x[i], tangent_points_y[i]]
-        v = [tangent_vectors_x[i], tangent_vectors_y[i]]
-        # Нормализуем направляющие векторы для лучшего отображения
-        length = np.sqrt(v[0]**2 + v[1]**2)
-        v_norm = [v[0]/length, v[1]/length]
-        
-        # Рисуем касательную через точку касания
-        plt.plot([p[0] - t[0]*v_norm[1], p[0] + t[1]*v_norm[1]], 
-                [p[1] + t[0]*v_norm[0], p[1] - t[1]*v_norm[0]], 
-                'r--', linewidth=1.5, alpha=0.7)
+    # Рисуем касательные - отрезки между вершинами многоугольника
+    for i in range(len(polygon_points)):
+        p1 = polygon_points[i]
+        p2 = polygon_points[(i+1)%len(polygon_points)]
+        plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'r--', linewidth=1.5)
 
     # Рисуем многоугольник
     if polygon_points:
@@ -159,12 +124,11 @@ def task1():
 
     plt.grid(True)
     plt.axis('equal')
-    # Устанавливаем более удобный масштаб для просмотра
     plt.xlim(-8, 8)
     plt.ylim(-8, 8)
-    plt.title('Задание 1: Конические сечения', fontsize=16)
+    plt.title('Задание 1: Конические сечения (эллипс)', fontsize=16)
     plt.legend(fontsize=12)
-    plt.savefig('task1_conic_sections.png', dpi=300, bbox_inches='tight')
+    plt.savefig('task1_ellipse_with_polygon.png', dpi=300, bbox_inches='tight')
     plt.show()
     
     return
@@ -186,7 +150,7 @@ def task2():
     print(f"   Параметрические уравнения: x = {a_lemniscate}*cos(t)/(1+sin²(t)), y = {a_lemniscate}*sin(t)*cos(t)/(1+sin²(t)), t ∈ [0; 2π)")
     
     # b) Найдем уравнения касательных и нормалей к кривым
-    t0_spiral = np.pi/2  # точка для спирали
+    t0_spiral = 6 * np.pi  # точка для спирали
     r0_spiral = np.exp(a_spiral * t0_spiral)
     x0_spiral = r0_spiral * np.cos(t0_spiral)
     y0_spiral = r0_spiral * np.sin(t0_spiral)
@@ -411,10 +375,8 @@ def task2():
     
     return
 
-# Основная функция
-def main():
-    task1()
-    task2()
+
 
 if __name__ == "__main__":
-    main()
+    task1()
+    task2()
