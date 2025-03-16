@@ -29,7 +29,7 @@ def triangle_transformations():
         [2, 3]     # Точка C
     ])
     
-    # Матрица однородных координат (добавляем "1" для каждой точки)
+    # Матрица однородных координат (добавляем 1 для каждой точки)
     homogeneous_coords = np.hstack((triangle_points, np.ones((3, 1))))
     
     # Создаем фигуру для отображения
@@ -58,7 +58,7 @@ def triangle_transformations():
     axes[0].set_title('Перенос на вектор (2, 2)')
     axes[0].plot(translated_points[:, 0], translated_points[:, 1], 'ro')
     
-    # б. Поворот R_0^φ - поворот на 45 градусов вокруг начала координат
+    # б. Поворот R_0^ф - поворот на 45 градусов вокруг начала координат
     angle = np.radians(45)
     rotation_matrix = np.array([
         [np.cos(angle), -np.sin(angle), 0],
@@ -96,7 +96,7 @@ def triangle_transformations():
     axes[3].set_title(f'Гомотетия с k={scale_factor} относительно (0,0)')
     axes[3].plot(scaled_points[:, 0], scaled_points[:, 1], 'yo')
     
-    # д. Композиция гомотетии и поворота на 180°
+    # д. Композиция гомотетии и поворота на 180гр
     # Найдем середину стороны AB
     midpoint = (triangle_points[0] + triangle_points[1]) / 2
     

@@ -1,393 +1,217 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
+from matplotlib.lines import Line2D
 
-def plot_triangle(ax, points, color='blue', alpha=0.5, label=None, marker='o'):
-    """Отображение треугольника"""
-    triangle = Polygon(points, closed=True, alpha=alpha, color=color, label=label)
-    ax.add_patch(triangle)
-    ax.plot(points[:, 0], points[:, 1], marker, color=color)
-    
-def plot_polygon(ax, points, color='blue', alpha=0.5, label=None, marker='o'):
-    """Отображение многоугольника"""
-    polygon = Polygon(points, closed=True, alpha=alpha, color=color, label=label)
-    ax.add_patch(polygon)
-    ax.plot(points[:, 0], points[:, 1], marker, color=color)
-    # Добавляем метки вершин
-    for i, point in enumerate(points):
-        ax.text(point[0], point[1], f'{i+1}', fontsize=10)
+# 1. Зададим квадрат KLMN с произвольными координатами
+# Пусть квадрат будет иметь сторону длиной 2 и центр в начале координат
+K = np.array([-1, -1])
+L = np.array([1, -1])
+M = np.array([1, 1])
+N = np.array([-1, 1])
 
-def apply_transform(points, transform_matrix):
-    """Применение матрицы преобразования к точкам"""
-    # Конвертация в однородные координаты
-    homogeneous_points = np.hstack((points, np.ones((points.shape[0], 1))))
-    # Применение преобразования
-    transformed_homogeneous = np.dot(homogeneous_points, transform_matrix.T)
-    # Конвертация обратно в декартовы координаты
-    return transformed_homogeneous[:, :2]
+# Функции для работы с однородными координатами
+def to_homogeneous(point):
+    """Преобразование из декартовых координат в однородные"""
+    return np.append(point, 1)
 
-# ----- Задание 1: Преобразование треугольника -----
-def triangle_transformations():
-    print("Задание 1: Преобразование треугольника")
-    
-    # a) Задаем треугольник декартовыми координатами
-    triangle_points = np.array([
-        [0, 0],    # Точка A
-        [4, 0],    # Точка B
-        [2, 3]     # Точка C
-    ])
-    
-    # Матрица однородных координат вершин треугольника
-    homogeneous_coords = np.hstack((triangle_points, np.ones((3, 1))))
-    print("a) Матрица однородных координат вершин треугольника:")
-    print(homogeneous_coords)
-    
-    # b) Задаем параметры преобразований
-    # Вычисляем центр треугольника (центроид)
-    center = np.mean(triangle_points, axis=0)
-    
-    # Находим наименьшую сторону и её середину
-    sides = [
-        np.linalg.norm(triangle_points[1] - triangle_points[0]),  # AB
-        np.linalg.norm(triangle_points[2] - triangle_points[1]),  # BC
-        np.linalg.norm(triangle_points[0] - triangle_points[2])   # CA
-    ]
-    min_side_idx = np.argmin(sides)
-    
-    # Определяем индексы вершин для наименьшей стороны
-    if min_side_idx == 0:  # AB
-        idx1, idx2 = 0, 1
-    elif min_side_idx == 1:  # BC
-        idx1, idx2 = 1, 2
-    else:  # CA
-        idx1, idx2 = 2, 0
-        
-    # Середина наименьшей стороны
-    midpoint_min_side = (triangle_points[idx1] + triangle_points[idx2]) / 2
-    
-    # Параметры преобразований
-    translation_vector = np.array([2, 1])  # Вектор для переноса
-    rotation_angle = np.radians(60)  # Угол поворота 60 градусов
-    line_point = np.array([0, 0])  # Точка на прямой l (ось X)
-    line_direction = np.array([1, 0])  # Направление прямой l (ось X)
-    scale_factor_origin = 1.5  # Коэффициент для гомотетии относительно начала координат
-    scale_factor_midpoint = 2  # Коэффициент для гомотетии относительно середины наименьшей стороны
-    
-    print(f"b) Параметры преобразований:")
-    print(f"   - Вектор переноса: {translation_vector}")
-    print(f"   - Угол поворота: {np.degrees(rotation_angle)} градусов")
-    print(f"   - Прямая для осевой симметрии: точка {line_point}, направление {line_direction}")
-    print(f"   - Коэффициент гомотетии H_O^k: {scale_factor_origin}")
-    print(f"   - Центр треугольника: {center}")
-    print(f"   - Наименьшая сторона: {min_side_idx+1}-я сторона, длина {sides[min_side_idx]:.2f}")
-    print(f"   - Середина наименьшей стороны: {midpoint_min_side}")
-    print(f"   - Коэффициент гомотетии H_M^m: {scale_factor_midpoint}")
-    
-    # Матрицы преобразований в однородных координатах
-    
-    # 1. Перенос T_a
-    translation_matrix = np.array([
-        [1, 0, translation_vector[0]],
-        [0, 1, translation_vector[1]],
-        [0, 0, 1]
-    ])
-    
-    # 2. Поворот R_C^φ относительно центра треугольника
-    # Сначала переносим центр в начало координат, затем поворачиваем, затем возвращаем обратно
-    to_origin = np.array([
-        [1, 0, -center[0]],
-        [0, 1, -center[1]],
-        [0, 0, 1]
-    ])
-    
-    rotation = np.array([
-        [np.cos(rotation_angle), -np.sin(rotation_angle), 0],
-        [np.sin(rotation_angle), np.cos(rotation_angle), 0],
-        [0, 0, 1]
-    ])
-    
-    from_origin = np.array([
-        [1, 0, center[0]],
-        [0, 1, center[1]],
-        [0, 0, 1]
-    ])
-    
-    rotation_matrix = from_origin @ rotation @ to_origin
-    
-    # 3. Осевая симметрия S_l относительно оси X
-    reflection_matrix = np.array([
-        [1, 0, 0],
-        [0, -1, 0],
-        [0, 0, 1]
-    ])
-    
-    # 4. Гомотетия H_O^k относительно начала координат
-    scaling_matrix_origin = np.array([
-        [scale_factor_origin, 0, 0],
-        [0, scale_factor_origin, 0],
-        [0, 0, 1]
-    ])
-    
-    # 5. Гомотетия H_M^m относительно середины наименьшей стороны
-    to_midpoint = np.array([
-        [1, 0, -midpoint_min_side[0]],
-        [0, 1, -midpoint_min_side[1]],
-        [0, 0, 1]
-    ])
-    
-    scaling = np.array([
-        [scale_factor_midpoint, 0, 0],
-        [0, scale_factor_midpoint, 0],
-        [0, 0, 1]
-    ])
-    
-    from_midpoint = np.array([
-        [1, 0, midpoint_min_side[0]],
-        [0, 1, midpoint_min_side[1]],
-        [0, 0, 1]
-    ])
-    
-    scaling_matrix_midpoint = from_midpoint @ scaling @ to_midpoint
-    
-    # 6. Композиция H_M^m ∘ R_M^π (гомотетия относительно середины наименьшей стороны и поворот на 180°)
-    # Поворот на 180 градусов
-    rotation_180 = np.array([
-        [np.cos(np.pi), -np.sin(np.pi), 0],
-        [np.sin(np.pi), np.cos(np.pi), 0],
-        [0, 0, 1]
-    ])
-    
-    # Поворот относительно середины наименьшей стороны
-    rotation_matrix_midpoint = from_midpoint @ rotation_180 @ to_midpoint
-    
-    # Композиция
-    composite_matrix = scaling_matrix_midpoint @ rotation_matrix_midpoint
-    
-    print("\nМатрицы преобразований в однородных координатах:")
-    print("1. Перенос T_a:")
-    print(translation_matrix)
-    print("\n2. Поворот R_C^φ относительно центра треугольника:")
-    print(rotation_matrix)
-    print("\n3. Осевая симметрия S_l относительно оси X:")
-    print(reflection_matrix)
-    print("\n4. Гомотетия H_O^k относительно начала координат:")
-    print(scaling_matrix_origin)
-    print("\n5. Гомотетия H_M^m относительно середины наименьшей стороны:")
-    print(scaling_matrix_midpoint)
-    print("\n6. Композиция H_M^m ∘ R_M^π:")
-    print(composite_matrix)
-    
-    # Применяем преобразования и находим образы треугольника
-    translated_points = apply_transform(triangle_points, translation_matrix)
-    rotated_points = apply_transform(triangle_points, rotation_matrix)
-    reflected_points = apply_transform(triangle_points, reflection_matrix)
-    scaled_points_origin = apply_transform(triangle_points, scaling_matrix_origin)
-    composite_points = apply_transform(triangle_points, composite_matrix)
-    
-    print("\nКоординаты образов треугольника:")
-    print("Исходный треугольник:")
-    print(triangle_points)
-    print("\nПосле переноса T_a:")
-    print(translated_points)
-    print("\nПосле поворота R_C^φ:")
-    print(rotated_points)
-    print("\nПосле осевой симметрии S_l:")
-    print(reflected_points)
-    print("\nПосле гомотетии H_O^k:")
-    print(scaled_points_origin)
-    print("\nПосле композиции H_M^m ∘ R_M^π:")
-    print(composite_points)
-    
-    # c) Визуализация
-    fig, ax = plt.subplots(figsize=(12, 10))
-    
-    # Отображаем исходный треугольник
-    plot_triangle(ax, triangle_points, color='blue', label='Исходный треугольник')
-    
-    # Отображаем образы треугольника
-    plot_triangle(ax, translated_points, color='red', label='После переноса T_a')
-    plot_triangle(ax, rotated_points, color='green', label='После поворота R_C^φ')
-    plot_triangle(ax, reflected_points, color='purple', label='После симметрии S_l')
-    plot_triangle(ax, scaled_points_origin, color='orange', label='После гомотетии H_O^k')
-    plot_triangle(ax, composite_points, color='cyan', label='После H_M^m ∘ R_M^π')
-    
-    # Отмечаем особые точки
-    ax.plot(center[0], center[1], 'ro', markersize=8, label='Центр треугольника C')
-    ax.plot(midpoint_min_side[0], midpoint_min_side[1], 'go', markersize=8, label='Середина мин. стороны M')
-    ax.plot(0, 0, 'ko', markersize=8, label='Начало координат O')
-    
-    # Настройка графика
-    ax.set_xlim(-10, 10)
-    ax.set_ylim(-6, 6)
-    ax.grid(True)
-    ax.set_aspect('equal')
-    ax.set_title('Преобразования треугольника')
-    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    
-    plt.tight_layout()
-    plt.savefig('triangle_transformations.png')
-    
-    return {
-        "triangle_points": triangle_points,
-        "homogeneous_coords": homogeneous_coords,
-        "center": center,
-        "midpoint_min_side": midpoint_min_side,
-        "translated_points": translated_points,
-        "rotated_points": rotated_points,
-        "reflected_points": reflected_points,
-        "scaled_points_origin": scaled_points_origin,
-        "composite_points": composite_points,
-        "matrices": {
-            "translation": translation_matrix,
-            "rotation": rotation_matrix,
-            "reflection": reflection_matrix,
-            "scaling_origin": scaling_matrix_origin,
-            "scaling_midpoint": scaling_matrix_midpoint,
-            "composite": composite_matrix
-        }
-    }
+def from_homogeneous(point):
+    """Преобразование из однородных координат в декартовы"""
+    return point[0:2] / point[2]
 
-# ----- Задание 2: Преобразование квадрата -----
-def square_transformation():
-    print("\n\nЗадание 2: Преобразование квадрата")
-    
-    # Задаем квадрат KLMN
-    square_points = np.array([
-        [0, 0],  # K - нижний левый
-        [2, 0],  # L - нижний правый
-        [2, 2],  # M - верхний правый
-        [0, 2]   # N - верхний левый
-    ])
-    
-    # Матрица однородных координат вершин квадрата
-    square_homogeneous = np.hstack((square_points, np.ones((4, 1))))
-    print("Матрица однородных координат вершин квадрата KLMN:")
-    print(square_homogeneous)
-    
-    # a) Найдем аффинное преобразование по заданным условиям
-    
-    # Вершина A лежит на луче KM и находится в 3 раза дальше от K, чем точка M
-    # Значит A = K + 3*(M-K) = K + 3*[2,2] = [0,0] + 3*[2,2] = [6,6]
-    A = np.array([6, 6])
-    
-    # Образ стороны KN (вертикальной) параллелен ей и его длина в 2 раза больше KN
-    # Значит длина B-A = 2*длина N-K = 2*2 = 4
-    # И поскольку она параллельна KN, то B = A + [0,-4] = [6,2]
-    B = np.array([6, 2])
-    
-    # Угол параллелограмма при вершине A равен π/3
-    # Это угол между векторами AB и AD
-    # AB = [0,-4], AD нужно найти
-    # Угол π/3 между AB и AD означает, что угол между осью x и AD равен π/3
-    # Значит D = A + [длина_AD*cos(π/3), длина_AD*sin(π/3)]
-    
-    # Высота параллелограмма BH, H ∈ AD равна двум сторонам квадрата, т.е. 4
-    # Высота BH перпендикулярна AD и равна 4
-    # Если |AD| = x, то 4 = x*sin(π/3) => x = 4/sin(π/3) = 4/(sqrt(3)/2) = 8/sqrt(3)
-    
-    angle_A = np.pi/3
-    length_AD = 4 / np.sin(angle_A)
-    D = A + np.array([length_AD * np.cos(angle_A), length_AD * np.sin(angle_A)])
-    
-    # C = B + (D - A) для замыкания параллелограмма
-    C = B + (D - A)
-    
-    # Координаты параллелограмма ABCD
-    parallelogram_points = np.array([A, B, C, D])
-    
-    print("\na) Найденный параллелограмм ABCD:")
-    print(f"A = {A}")
-    print(f"B = {B}")
-    print(f"C = {C}")
-    print(f"D = {D}")
-    
-    # b) Составляем матрицу преобразования F
-    # Нам нужно найти матрицу F такую, что:
-    # F(K) = A, F(L) = B, F(M) = C, F(N) = D
-    
-    # Для аффинного преобразования F в форме матрицы 3x3 в однородных координатах
-    # нам нужно решить систему линейных уравнений:
-    # F * [K; 1] = [A; 1]
-    # F * [L; 1] = [B; 1]
-    # F * [M; 1] = [C; 1]
-    
-    # Мы можем использовать только 3 точки, так как 4-я определяется однозначно
-    # Формируем матрицы для решения системы AX = B
-    X = np.column_stack((square_points[:3], np.ones(3)))
-    Y = np.column_stack((parallelogram_points[:3], np.ones(3)))
-    
-    # Решаем систему уравнений для нахождения матрицы преобразования
-    F_matrix = np.linalg.solve(X, Y)
-    
-    # Транспонируем, чтобы получить матрицу 3x3
-    F_matrix = F_matrix.T
-    
-    print("\nb) Матрица преобразования F в однородных координатах:")
-    print(F_matrix)
-    
-    # Находим матрицу обратного преобразования
-    F_inverse = np.linalg.inv(F_matrix)
-    print("\nМатрица обратного преобразования F^(-1):")
-    print(F_inverse)
-    
-    # c) Находим матрицы однородных координат образов
-    # Применяем преобразование F к квадрату KLMN
-    F_KLMN = apply_transform(square_points, F_matrix)
-    
-    # Применяем обратное преобразование F^(-1) к параллелограмму ABCD
-    F_inv_ABCD = apply_transform(parallelogram_points, F_inverse)
-    
-    print("\nc) Матрица однородных координат образа F(KLMN):")
-    print(np.hstack((F_KLMN, np.ones((4, 1)))))
-    print("\nМатрица однородных координат образа F^(-1)(ABCD):")
-    print(np.hstack((F_inv_ABCD, np.ones((4, 1)))))
-    
-    # d) Визуализация
-    fig, ax = plt.subplots(figsize=(10, 8))
-    
-    # Отображаем квадрат KLMN
-    plot_polygon(ax, square_points, color='blue', alpha=0.6, label='Квадрат KLMN')
-    
-    # Отображаем параллелограмм ABCD
-    plot_polygon(ax, parallelogram_points, color='red', alpha=0.6, label='Параллелограмм ABCD = F(KLMN)')
-    
-    # Отображаем образ F^(-1)(ABCD)
-    plot_polygon(ax, F_inv_ABCD, color='green', alpha=0.4, label='F^(-1)(ABCD)')
-    
-    # Проверяем, что образы соответствуют оригиналам
-    error_F_KLMN = np.linalg.norm(F_KLMN - parallelogram_points)
-    error_F_inv_ABCD = np.linalg.norm(F_inv_ABCD - square_points)
-    
-    print(f"\ne) Проверка F(KLMN) = ABCD:")
-    print(f"Ошибка: {error_F_KLMN}")
-    print(f"Проверка F^(-1)(ABCD) = KLMN:")
-    print(f"Ошибка: {error_F_inv_ABCD}")
-    
-    # Настройка графика
-    ax.set_xlim(-1, 10)
-    ax.set_ylim(-1, 8)
-    ax.grid(True)
-    ax.set_aspect('equal')
-    ax.set_title('Преобразование квадрата в параллелограмм')
-    ax.legend()
-    
-    plt.tight_layout()
-    plt.savefig('square_transformation.png')
-    
-    return {
-        "square_points": square_points,
-        "parallelogram_points": parallelogram_points,
-        "F_matrix": F_matrix,
-        "F_inverse": F_inverse,
-        "F_KLMN": F_KLMN,
-        "F_inv_ABCD": F_inv_ABCD
-    }
+# Составим матрицу однородных координат вершин квадрата
+square_vertices = np.array([K, L, M, N])
+square_homogeneous = np.column_stack((square_vertices, np.ones(4)))
+print("Матрица однородных координат вершин квадрата:")
+print(square_homogeneous)
 
-# Выполнить все задачи
-if __name__ == "__main__":
-    print("Лабораторная №1. Аффинные преобразования. Однородные координаты.")
-    
-    triangle_results = triangle_transformations()
-    square_results = square_transformation()
-    
-    plt.show()
+# 2. Найдем аффинное преобразование F, при котором образом квадрата будет параллелограмм ABCD
+# По условию: F(K)=A, F(L)=B, F(M)=C, F(N)=D
+
+# Условия:
+# - вершина A лежит на луче KM и находится в три раза дальше от вершины K, чем точка M
+# Значит, A = K + 3*(M-K) = K + 3*M - 3*K = 3*M - 2*K
+A = K + 3 * (M - K)
+print(f"Координаты точки A: {A}")
+
+# - образ стороны KN ей параллелен и его длина в два раза больше KN
+# Поскольку KN вертикальна, B должна быть на той же вертикали что и A,
+# и быть выше на расстояние 2*|KN| = 2*2 = 4
+B = A + np.array([0, 4])
+print(f"Координаты точки B: {B}")
+
+# - угол параллелограмма при вершине A равен π/4
+# - высота параллелограмма BH, H ∈ AD, равна двум сторонам квадрата
+# Длина стороны квадрата = 2, поэтому высота = 4
+# Из этого можно вычислить координаты точки C
+
+# Вычислим направление AD под углом π/4 к горизонтали
+angle = np.pi/4
+direction_AD = np.array([np.cos(angle), np.sin(angle)])
+direction_AD = direction_AD / np.linalg.norm(direction_AD)
+
+# Найдем длину AD такую, чтобы высота была равна 4
+# Высота = |AD| * sin(π/4) = 4
+# |AD| = 4 / sin(π/4) = 4 / (1/√2) = 4√2
+length_AD = 4 / np.sin(angle)
+D = A + length_AD * direction_AD
+print(f"Координаты точки D: {D}")
+
+# C = B + (D - A)
+C = B + (D - A)
+print(f"Координаты точки C: {C}")
+
+# Проверим, что высота BH действительно равна 4
+# Высота BH — это проекция вектора BA на перпендикуляр к AD
+perpendicular_AD = np.array([-direction_AD[1], direction_AD[0]])  # Перпендикуляр к AD
+height = abs(np.dot(B - A, perpendicular_AD))
+print(f"Высота параллелограмма: {height}")
+
+# 3. Составим матрицу преобразования F в однородных координатах
+# Нам известны координаты точек K, L, M, N и их образов A, B, C, D
+# Можем составить систему уравнений и решить её
+
+# Параллелограмм в однородных координатах
+parallelogram_vertices = np.array([A, B, C, D])
+parallelogram_homogeneous = np.column_stack((parallelogram_vertices, np.ones(4)))
+
+# Для нахождения матрицы преобразования F, мы должны решить уравнение:
+# F * square_homogeneous^T = parallelogram_homogeneous^T
+# где ^T означает транспонирование
+
+# Решаем систему уравнений для нахождения матрицы F
+F = np.dot(parallelogram_homogeneous.T, np.linalg.pinv(square_homogeneous.T))
+print("\nМатрица преобразования F:")
+print(F)
+
+# 4. Проверим, что F действительно преобразует квадрат в параллелограмм
+transformed_square = np.dot(square_homogeneous, F.T)
+transformed_square = transformed_square[:, :2] / transformed_square[:, 2:]
+print("\nКоординаты преобразованного квадрата:")
+print(transformed_square)
+print("\nКоординаты целевого параллелограмма:")
+print(parallelogram_vertices)
+
+# 5. Найдем матрицу обратного преобразования F^(-1)
+F_inverse = np.linalg.inv(F)
+print("\nМатрица обратного преобразования F^(-1):")
+print(F_inverse)
+
+# 6. Проверим, что F^(-1) преобразует параллелограмм обратно в квадрат
+inverse_transformed_parallelogram = np.dot(parallelogram_homogeneous, F_inverse.T)
+inverse_transformed_parallelogram = inverse_transformed_parallelogram[:, :2] / inverse_transformed_parallelogram[:, 2:]
+print("\nКоординаты обратно преобразованного параллелограмма:")
+print(inverse_transformed_parallelogram)
+print("\nКоординаты исходного квадрата:")
+print(square_vertices)
+
+# 7. Визуализация
+plt.figure(figsize=(12, 10))
+
+# Рисуем исходный квадрат
+ax1 = plt.subplot(2, 2, 1)
+square = Polygon(square_vertices, fill=False, edgecolor='blue', linewidth=2)
+ax1.add_patch(square)
+ax1.scatter(square_vertices[:, 0], square_vertices[:, 1], color='blue')
+ax1.text(K[0]-0.2, K[1]-0.2, 'K', fontsize=12)
+ax1.text(L[0]+0.1, L[1]-0.2, 'L', fontsize=12)
+ax1.text(M[0]+0.1, M[1]+0.1, 'M', fontsize=12)
+ax1.text(N[0]-0.2, N[1]+0.1, 'N', fontsize=12)
+ax1.set_xlim(-5, 5)
+ax1.set_ylim(-5, 5)
+ax1.set_aspect('equal')
+ax1.grid(True)
+ax1.set_title('Исходный квадрат KLMN')
+
+# Рисуем параллелограмм (образ квадрата)
+ax2 = plt.subplot(2, 2, 2)
+parallelogram = Polygon(parallelogram_vertices, fill=False, edgecolor='red', linewidth=2)
+ax2.add_patch(parallelogram)
+ax2.scatter(parallelogram_vertices[:, 0], parallelogram_vertices[:, 1], color='red')
+ax2.text(A[0]-0.2, A[1]-0.2, 'A', fontsize=12)
+ax2.text(B[0]+0.1, B[1]-0.2, 'B', fontsize=12)
+ax2.text(C[0]+0.1, C[1]+0.1, 'C', fontsize=12)
+ax2.text(D[0]-0.2, D[1]+0.1, 'D', fontsize=12)
+ax2.set_xlim(-5, 12)
+ax2.set_ylim(-5, 12)
+ax2.set_aspect('equal')
+ax2.grid(True)
+ax2.set_title('Параллелограмм ABCD = F(KLMN)')
+
+# Рисуем оба объекта и преобразование
+ax3 = plt.subplot(2, 2, 3)
+# Рисуем исходный квадрат
+square = Polygon(square_vertices, fill=False, edgecolor='blue', linewidth=2)
+ax3.add_patch(square)
+ax3.scatter(square_vertices[:, 0], square_vertices[:, 1], color='blue')
+ax3.text(K[0]-0.2, K[1]-0.2, 'K', fontsize=12)
+ax3.text(L[0]+0.1, L[1]-0.2, 'L', fontsize=12)
+ax3.text(M[0]+0.1, M[1]+0.1, 'M', fontsize=12)
+ax3.text(N[0]-0.2, N[1]+0.1, 'N', fontsize=12)
+
+# Рисуем параллелограмм
+parallelogram = Polygon(parallelogram_vertices, fill=False, edgecolor='red', linewidth=2)
+ax3.add_patch(parallelogram)
+ax3.scatter(parallelogram_vertices[:, 0], parallelogram_vertices[:, 1], color='red')
+ax3.text(A[0]-0.2, A[1]-0.2, 'A', fontsize=12)
+ax3.text(B[0]+0.1, B[1]-0.2, 'B', fontsize=12)
+ax3.text(C[0]+0.1, C[1]+0.1, 'C', fontsize=12)
+ax3.text(D[0]-0.2, D[1]+0.1, 'D', fontsize=12)
+
+# Рисуем стрелки преобразования
+for i in range(4):
+    ax3.arrow(square_vertices[i, 0], square_vertices[i, 1], 
+              parallelogram_vertices[i, 0] - square_vertices[i, 0], 
+              parallelogram_vertices[i, 1] - square_vertices[i, 1],
+              head_width=0.2, head_length=0.3, fc='green', ec='green', alpha=0.5)
+
+ax3.set_xlim(-5, 12)
+ax3.set_ylim(-5, 12)
+ax3.set_aspect('equal')
+ax3.grid(True)
+ax3.set_title('Преобразование F: KLMN → ABCD')
+
+# Рисуем обратное преобразование
+ax4 = plt.subplot(2, 2, 4)
+# Рисуем параллелограмм
+parallelogram = Polygon(parallelogram_vertices, fill=False, edgecolor='red', linewidth=2)
+ax4.add_patch(parallelogram)
+ax4.scatter(parallelogram_vertices[:, 0], parallelogram_vertices[:, 1], color='red')
+ax4.text(A[0]-0.2, A[1]-0.2, 'A', fontsize=12)
+ax4.text(B[0]+0.1, B[1]-0.2, 'B', fontsize=12)
+ax4.text(C[0]+0.1, C[1]+0.1, 'C', fontsize=12)
+ax4.text(D[0]-0.2, D[1]+0.1, 'D', fontsize=12)
+
+# Рисуем исходный квадрат
+square = Polygon(square_vertices, fill=False, edgecolor='blue', linewidth=2)
+ax4.add_patch(square)
+ax4.scatter(square_vertices[:, 0], square_vertices[:, 1], color='blue')
+ax4.text(K[0]-0.2, K[1]-0.2, 'K', fontsize=12)
+ax4.text(L[0]+0.1, L[1]-0.2, 'L', fontsize=12)
+ax4.text(M[0]+0.1, M[1]+0.1, 'M', fontsize=12)
+ax4.text(N[0]-0.2, N[1]+0.1, 'N', fontsize=12)
+
+# Рисуем стрелки преобразования
+for i in range(4):
+    ax4.arrow(parallelogram_vertices[i, 0], parallelogram_vertices[i, 1], 
+              square_vertices[i, 0] - parallelogram_vertices[i, 0], 
+              square_vertices[i, 1] - parallelogram_vertices[i, 1],
+              head_width=0.2, head_length=0.3, fc='purple', ec='purple', alpha=0.5)
+
+ax4.set_xlim(-5, 12)
+ax4.set_ylim(-5, 12)
+ax4.set_aspect('equal')
+ax4.grid(True)
+ax4.set_title('Обратное преобразование F^(-1): ABCD → KLMN')
+
+# Добавление легенды
+legend_elements = [
+    Line2D([0], [0], color='blue', lw=2, label='Квадрат KLMN'),
+    Line2D([0], [0], color='red', lw=2, label='Параллелограмм ABCD'),
+    Line2D([0], [0], color='green', lw=2, label='Преобразование F'),
+    Line2D([0], [0], color='purple', lw=2, label='Обратное преобразование F^(-1)')
+]
+ax4.legend(handles=legend_elements, loc='upper right')
+
+plt.tight_layout()
+plt.show()
