@@ -4,11 +4,15 @@ from matplotlib.patches import Polygon
 import sympy as sp
 from sympy import symbols, solve, diff, sqrt, cosh, sinh
 
-# Настраиваем параметры графиков для корректного отображения русского текста
+# ************************************
+# исправления
+# 1. показать где подсчитывается полярный радиус
+# 2. поменять точки относительно которых подсчитывается
+# ************************************
+
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['font.size'] = 12
 
-# Задание 1: Конические сечения (эллипс и гипербола)
 def task1():
     print("Задание 1: Конические сечения")
     
@@ -132,7 +136,6 @@ def task1():
     # Гипербола
     print(f"Эволюта гиперболы: x = {(a**2 + b**2):.2f}*cosh(t)^3/{a:.2f}, y = -{(a**2 + b**2):.2f}*sinh(t)^3/{b:.2f}, t ∈ [-{t_max_hyperbola}; {t_max_hyperbola}]")
 
-    # Визуализация
     plt.figure(figsize=(15, 12))
 
     # Эллипс
@@ -202,8 +205,8 @@ def task2():
     print(f"   Параметрические уравнения: x = {a_lemniscate}*cos(t)/(1+sin²(t)), y = {a_lemniscate}*sin(t)*cos(t)/(1+sin²(t)), t ∈ [0; 2π)")
     
     # b) Найдем уравнения касательных и нормалей к кривым
-    t0_spiral = 6 * np.pi  # точка для спирали
-    r0_spiral = np.exp(a_spiral * t0_spiral)
+    t0_spiral =  np.pi / 2 # точка для спирали !!!
+    r0_spiral = np.exp(a_spiral * t0_spiral) # полярный радиус
     x0_spiral = r0_spiral * np.cos(t0_spiral)
     y0_spiral = r0_spiral * np.sin(t0_spiral)
     
@@ -224,7 +227,7 @@ def task2():
     print(f"   Нормаль: y = {k_normal_spiral:.4f}*x + {b_normal_spiral:.4f}")
     
     # Точка для лемнискаты
-    t0_lemniscate = np.pi/6
+    t0_lemniscate = np.pi/6 # !!!
     
     # Вычисляем координаты точки на лемнискате
     r0_lemniscate = np.sqrt(a_lemniscate**2 * np.cos(2*t0_lemniscate))
@@ -263,7 +266,7 @@ def task2():
     length_tangent_spiral = np.sqrt(tangent_vector_spiral[0]**2 + tangent_vector_spiral[1]**2)
     tangent_vector_spiral = [v/length_tangent_spiral for v in tangent_vector_spiral]
     
-    normal_vector_spiral = [-tangent_vector_spiral[1], tangent_vector_spiral[0]]
+    normal_vector_spiral = [-tangent_vector_spiral[1], tangent_vector_spiral[0]] # поворот касат вектора на 90 гр
     
     # Для лемнискаты
     tangent_vector_lemniscate = [dx_dt_lemniscate_val, dy_dt_lemniscate_val]
