@@ -121,6 +121,7 @@ def compute_voronoi_naive(points):
     
     vertex_dict = {}
     
+    # находим инфу о центрах и точках
     for i in range(n):
         for j in range(i + 1, n):
             for k in range(j + 1, n):
@@ -165,9 +166,6 @@ def compute_voronoi_naive(points):
     return np.array(vertices), edges
 
 def compute_voronoi_divide_conquer(points):
-    """
-    Строит диаграмму Вороного методом 'разделяй и властвуй'
-    """
     n = len(points)
     
     # Для малого количества точек используем наивный алгоритм
