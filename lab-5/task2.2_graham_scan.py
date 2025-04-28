@@ -100,7 +100,6 @@ def polygon_intersection(F1, F2):
     # окончательный hull из кандидатов
     return graham_scan(uniq)
 
-# — main —
 E1 = generate_points(9, seed=22)
 E2 = generate_points(8, seed=7)
 F1 = graham_scan(E1)
@@ -110,7 +109,6 @@ P  = polygon_intersection(F1, F2)
 internal_E1 = [p for p in E1 if is_strictly_inside(p, P)]
 internal_E2 = [p for p in E2 if is_strictly_inside(p, P)]
 
-# — plotting —
 plt.figure(figsize=(8,8))
 for i,p in enumerate(E1):
     plt.scatter(*p, c='blue');  plt.text(p[0],p[1]+.3,f"E1_{i}",color='blue')
@@ -132,7 +130,6 @@ for p in internal_E2:
 plt.axis('equal'); plt.grid(True)
 plt.show()
 
-# — вывод в консоль —
 print("E1:", E1)
 print("E2:", E2)
 print("conv(E1):", F1)

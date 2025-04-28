@@ -246,10 +246,10 @@ def compute_voronoi_diagram(points):
     
     return vertices, edges, infinite_edges
 
-def build_delaunay_from_voronoi(points, voronoi_vertices, voronoi_edges):
+def build_delaunay_from_voronoi_complete(points, voronoi_vertices, voronoi_edges, infinite_edges):
     """
-    Строит триангуляцию Делоне на основе диаграммы Вороного
-    Возвращает список рёбер триангуляции
+    Строит полную триангуляцию Делоне на основе диаграммы Вороного,
+    учитывая также бесконечные рёбра для построения выпуклой оболочки
     """
     n = len(points)
     delaunay_edges = []
@@ -287,12 +287,109 @@ def build_delaunay_from_voronoi(points, voronoi_vertices, voronoi_edges):
             if point_pair not in delaunay_edges and (point_pair[1], point_pair[0]) not in delaunay_edges:
                 delaunay_edges.append(point_pair)
     
+    # Обрабатываем бесконечные рёбра для выпуклой оболочки
+    point_neighbors = defaultdict(set)
+    
+    # Заполняем соседей для каждой точки
+    for i, j in delaunay_edges:
+        point_neighbors[i].add(j)
+        point_neighbors[j].add(i)
+    
+    # Обрабатываем бесконечные рёбра
+    for vertex_idx, midpoint, direction in infinite_edges:
+        vertex = voronoi_vertices[vertex_idx]
+        
+        # Находим точки, для которых это бесконечное ребро является границей ячеек
+        candidates = []
+        for i in range(n):
+            dist_i = euclidean_distance(points[i], vertex)
+            
+            for j in range(i + 1, n):
+                dist_j = euclidean_distance(points[j], vertex)
+                
+                if abs(dist_i - dist_j) < 1e-10:
+                    # Проверяем, что это ребро действительно соответствует точкам i и j
+                    midpoint_ij = (points[i] + points[j]) / 2
+                    perp_vector = np.array([-(points[j][1] - points[i][1]), points[j][0] - points[i][0]])
+                    perp_vector = perp_vector / np.linalg.norm(perp_vector)
+                    
+                    # Если направления примерно параллельны, это наше ребро
+                    dot_product = abs(np.dot(perp_vector, direction))
+                    if dot_product > 0.99:  # Почти параллельны
+                        candidates.append((i, j))
+        
+        # Добавляем найденные пары точек как рёбра триангуляции Делоне
+        for point_pair in candidates:
+            if point_pair not in delaunay_edges and (point_pair[1], point_pair[0]) not in delaunay_edges:
+                delaunay_edges.append(point_pair)
+    
+    # Дополнительно: находим выпуклую оболочку и добавляем её рёбра
+    hull_edges = compute_convex_hull(points)
+    for edge in hull_edges:
+        if edge not in delaunay_edges and (edge[1], edge[0]) not in delaunay_edges:
+            delaunay_edges.append(edge)
+    
     return delaunay_edges
+
+def compute_convex_hull(points):
+    """
+    Вычисляет выпуклую оболочку с помощью алгоритма Джарвиса (метод заворачивания подарка)
+    Возвращает список рёбер выпуклой оболочки
+    """
+    n = len(points)
+    if n <= 2:
+        if n == 2:
+            return [(0, 1)]
+        return []
+    
+    # Находим самую левую точку
+    leftmost = min(range(n), key=lambda i: points[i][0])
+    
+    hull = []
+    p = leftmost
+    q = 0
+    
+    while True:
+        hull.append(p)
+        
+        q = (p + 1) % n
+        for i in range(n):
+            # Если точка i слева от линии p-q
+            if orientation(points[p], points[i], points[q]) == 2:
+                q = i
+        
+        p = q
+        
+        # Завершаем, если вернулись к началу
+        if p == leftmost:
+            break
+    
+    # Строим рёбра выпуклой оболочки
+    hull_edges = []
+    for i in range(len(hull)):
+        hull_edges.append((hull[i], hull[(i + 1) % len(hull)]))
+    
+    return hull_edges
+
+def orientation(p, q, r):
+    """
+    Определяет ориентацию тройки точек (p, q, r)
+    Возвращает:
+    0 - коллинеарны
+    1 - по часовой стрелке
+    2 - против часовой стрелки
+    """
+    val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
+    
+    if abs(val) < 1e-10:
+        return 0  # коллинеарны
+    
+    return 2 if val > 0 else 1  # 2 для против часовой, 1 для по часовой
 
 def plot_solution(points):
     """
     Строит две диаграммы: Вороного и Делоне на разных картинках
-    с разными цветами и отображает ближайшую пару точек
+    с улучшенной визуализацией и без пунктирных линий
     """
     # Ищем ближайшую пару точек
     closest_pair, min_dist = find_closest_pair_divide_conquer(points)
@@ -300,11 +397,11 @@ def plot_solution(points):
     # Строим диаграмму Вороного
     voronoi_vertices, voronoi_edges, infinite_edges = compute_voronoi_diagram(points)
     
-    # Строим триангуляцию Делоне
-    delaunay_edges = build_delaunay_from_voronoi(points, voronoi_vertices, voronoi_edges)
+    # Строим триангуляцию Делоне с полным замыканием
+    delaunay_edges = build_delaunay_from_voronoi_complete(points, voronoi_vertices, voronoi_edges, infinite_edges)
     
     # Настройка параметров графиков
-    margin = 1.0
+    margin = 1.5  # Увеличиваем отступ для лучшей видимости
     x_min, y_min = np.min(points, axis=0) - margin
     x_max, y_max = np.max(points, axis=0) + margin
     
@@ -313,6 +410,9 @@ def plot_solution(points):
     ax1.set_xlim(x_min, x_max)
     ax1.set_ylim(y_min, y_max)
     
+    # Настройка сетки - делаем её менее заметной
+    ax1.grid(True, linestyle='-', linewidth=0.5, alpha=0.3)
+    
     # Рисуем точки
     ax1.scatter(points[:, 0], points[:, 1], c='black', s=70, zorder=3)
     
@@ -320,26 +420,34 @@ def plot_solution(points):
     for v1_idx, v2_idx in voronoi_edges:
         v1 = voronoi_vertices[v1_idx]
         v2 = voronoi_vertices[v2_idx]
-        ax1.plot([v1[0], v2[0]], [v1[1], v2[1]], 'purple', lw=2, zorder=1)
+        ax1.plot([v1[0], v2[0]], [v1[1], v2[1]], 
+                 'purple', lw=2, zorder=1, solid_capstyle='round')
     
-    # Рисуем бесконечные рёбра диаграммы Вороного
+    # Рисуем бесконечные рёбра диаграммы Вороного - сплошные вместо пунктирных
     for vertex_idx, midpoint, direction in infinite_edges:
         vertex = voronoi_vertices[vertex_idx]
         scale = max(abs(x_max - x_min), abs(y_max - y_min)) * 2
         far_point = vertex + direction * scale
-        ax1.plot([vertex[0], far_point[0]], [vertex[1], far_point[1]], 'purple', linestyle='--', lw=1.5, zorder=1)
+        ax1.plot([vertex[0], far_point[0]], [vertex[1], far_point[1]], 
+                 'purple', linestyle='-', lw=2, zorder=1, solid_capstyle='round', alpha=0.7)
     
     # Рисуем вершины диаграммы Вороного
     if len(voronoi_vertices) > 0:
-        ax1.scatter(voronoi_vertices[:, 0], voronoi_vertices[:, 1], c='purple', s=40, alpha=0.7, zorder=2)
+        ax1.scatter(voronoi_vertices[:, 0], voronoi_vertices[:, 1], 
+                   c='purple', s=40, alpha=0.7, zorder=2, edgecolor='white')
     
     # Выделяем ближайшую пару точек на диаграмме Вороного
     ax1.plot([points[closest_pair[0]][0], points[closest_pair[1]][0]],
-             [points[closest_pair[0]][1], points[closest_pair[1]][1]], 'lime', lw=3, zorder=4)
-    ax1.scatter(points[closest_pair, 0], points[closest_pair, 1], c='lime', s=120, zorder=5)
+             [points[closest_pair[0]][1], points[closest_pair[1]][1]], 
+             'lime', lw=3, zorder=4, solid_capstyle='round')
+    ax1.scatter(points[closest_pair, 0], points[closest_pair, 1], 
+               c='lime', s=120, zorder=5, edgecolor='black', linewidth=1)
     
-    ax1.set_title('Диаграмма Вороного')
-    ax1.grid(True)
+    # Подписываем точки
+    for i, point in enumerate(points):
+        ax1.annotate(f"P{i+1}", (point[0]+0.1, point[1]+0.1), fontsize=10)
+    
+    ax1.set_title('Диаграмма Вороного', fontsize=14)
     ax1.set_aspect('equal')
     
     # Триангуляция Делоне
@@ -347,20 +455,29 @@ def plot_solution(points):
     ax2.set_xlim(x_min, x_max)
     ax2.set_ylim(y_min, y_max)
     
+    # Настройка сетки - делаем её менее заметной
+    ax2.grid(True, linestyle='-', linewidth=0.5, alpha=0.3)
+    
     # Рисуем точки
     ax2.scatter(points[:, 0], points[:, 1], c='black', s=70, zorder=3)
     
     # Рисуем рёбра триангуляции Делоне
     for i, j in delaunay_edges:
-        ax2.plot([points[i][0], points[j][0]], [points[i][1], points[j][1]], 'orange', lw=2, zorder=1)
+        ax2.plot([points[i][0], points[j][0]], [points[i][1], points[j][1]], 
+                'orange', lw=2, zorder=1, solid_capstyle='round')
     
     # Выделяем ближайшую пару точек на триангуляции Делоне
     ax2.plot([points[closest_pair[0]][0], points[closest_pair[1]][0]],
-             [points[closest_pair[0]][1], points[closest_pair[1]][1]], 'lime', lw=3, zorder=4)
-    ax2.scatter(points[closest_pair, 0], points[closest_pair, 1], c='lime', s=120, zorder=5)
+             [points[closest_pair[0]][1], points[closest_pair[1]][1]], 
+             'lime', lw=3, zorder=4, solid_capstyle='round')
+    ax2.scatter(points[closest_pair, 0], points[closest_pair, 1], 
+               c='lime', s=120, zorder=5, edgecolor='black', linewidth=1)
     
-    ax2.set_title('Триангуляция Делоне')
-    ax2.grid(True)
+    # Подписываем точки
+    for i, point in enumerate(points):
+        ax2.annotate(f"P{i+1}", (point[0]+0.1, point[1]+0.1), fontsize=10)
+    
+    ax2.set_title('Триангуляция Делоне', fontsize=14)
     ax2.set_aspect('equal')
     
     plt.tight_layout()
