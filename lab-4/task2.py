@@ -2,7 +2,7 @@ import math
 import matplotlib.pyplot as plt
 
 heptagon = [(0, 0), (2, -1), (4, 0), (5, 2), (4, 4), (2, 5), (0, 4)]
-test_points = [(2, 2), (3, 3), (10, 10), (2, 5)]
+test_points = [(6, 2), (3, 3), (10, 10), (2, 7)]
 
 def vector_angle(p, v1, v2):
     vec1 = (v1[0] - p[0], v1[1] - p[1])
