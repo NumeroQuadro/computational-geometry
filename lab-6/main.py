@@ -1,330 +1,175 @@
-import matplotlib.pyplot as plt
 import numpy as np
-from collections import defaultdict
+import matplotlib.pyplot as plt
+from scipy.spatial import Delaunay, Voronoi, voronoi_plot_2d
+import random
 
-# Входные точки
-points = [
-    (1, 1),   # P1
-    (2, 4),   # P2
-    (5, 2),   # P3
-    (6, 6),   # P4
-    (8, 3),   # P5
-    (3, 7),   # P6
-    (9, 8),   # P7
-    (4, 9),   # P8
-    (10, 1),  # P9
-    (7, 5)    # P10
-]
+def euclidean_distance(p1, p2):
+    """Вычисляет евклидово расстояние между двумя точками"""
+    return np.sqrt(np.sum((p1 - p2) ** 2))
 
-# Класс для представления ребра диаграммы Вороного
-class Edge:
-    def __init__(self, start, end, left_point, right_point):
-        self.start = start
-        self.end = end
-        self.left_point = left_point
-        self.right_point = right_point
-
-    def __repr__(self):
-        return f"Edge(start={self.start}, end={self.end}, left={self.left_point}, right={self.right_point})"
-
-# Вычисление перпендикулярного бисектора для двух точек
-def perpendicular_bisector(p1, p2):
-    mid_x = (p1[0] + p2[0]) / 2
-    mid_y = (p1[1] + p2[1]) / 2
-
-    if p1[0] == p2[0]:  # Вертикальная линия
-        return mid_x, None, mid_y, 'vertical'
-    else:
-        slope = (p2[1] - p1[1]) / (p2[0] - p1[0])
-        if slope == 0:  # Горизонтальная линия
-            return None, mid_x, mid_y, 'horizontal'
-        perp_slope = -1 / slope
-        return perp_slope, mid_x, mid_y, 'normal'
-
-# Нахождение пересечения двух бисекторов
-def intersect_bisectors(b1, b2):
-    slope1, mid_x1, mid_y1, type1 = b1
-    slope2, mid_x2, mid_y2, type2 = b2
-
-    if type1 == 'vertical' and type2 == 'vertical':
-        return None
-    elif type1 == 'vertical':
-        x = mid_x1
-        if type2 == 'horizontal':
-            y = mid_y2
-        else:
-            y = slope2 * (x - mid_x2) + mid_y2
-        return (x, y) if -10 <= x <= 20 and -10 <= y <= 20 else None
-    elif type2 == 'vertical':
-        x = mid_x2
-        if type1 == 'horizontal':
-            y = mid_y1
-        else:
-            y = slope1 * (x - mid_x1) + mid_y1
-        return (x, y) if -10 <= x <= 20 and -10 <= y <= 20 else None
-    elif type1 == 'horizontal' and type2 == 'horizontal':
-        return None
-    elif type1 == 'horizontal':
-        y = mid_y1
-        x = (y - mid_y2) / slope2 + mid_x2
-        return (x, y) if -10 <= x <= 20 and -10 <= y <= 20 else None
-    elif type2 == 'horizontal':
-        y = mid_y2
-        x = (y - mid_y1) / slope1 + mid_x1
-        return (x, y) if -10 <= x <= 20 and -10 <= y <= 20 else None
-    else:
-        if abs(slope1 - slope2) < 1e-6:
-            return None
-        x = (slope1 * mid_x1 - slope2 * mid_x2 + mid_y2 - mid_y1) / (slope1 - slope2)
-        y = slope1 * (x - mid_x1) + mid_y1
-        return (x, y) if -10 <= x <= 20 and -10 <= y <= 20 else None
-
-# Построение диаграммы Вороного методом Divide and Conquer
-def voronoi_diagram(points):
-    if len(points) <= 1:
-        return [], []
-
+def find_closest_pair_divide_conquer(points):
+    """Находит ближайшую пару точек методом 'разделяй и властвуй'"""
     # Сортируем точки по x-координате
-    points = sorted(points, key=lambda p: p[0])
-
-    # Базовый случай: 2 или 3 точки
-    if len(points) <= 3:
-        return voronoi_base_case(points)
-
-    # Разделяем на две половины
-    mid = len(points) // 2
-    left_points = points[:mid]
-    right_points = points[mid:]
-
-    # Рекурсивно строим диаграммы
-    left_edges, left_vertices = voronoi_diagram(left_points)
-    right_edges, right_vertices = voronoi_diagram(right_points)
-
-    # Сливаем диаграммы
-    edges, vertices = merge_voronoi(left_edges, right_edges, left_vertices, right_vertices, left_points, right_points)
-
-    # Обрезаем рёбра до границ области
-    bounds = (-2, 12, -2, 12)  # (xmin, xmax, ymin, ymax)
-    clipped_edges = clip_edges(edges, bounds)
-
-    return clipped_edges, vertices
-
-# Базовый случай: диаграмма Вороного для 2 или 3 точек
-def voronoi_base_case(points):
-    edges = []
-    vertices = []
-
-    if len(points) == 2:
-        p1, p2 = points
-        bisector = perpendicular_bisector(p1, p2)
-        if bisector[3] == 'vertical':
-            edge = Edge((bisector[0], -2), (bisector[0], 12), p1, p2)
-        elif bisector[3] == 'horizontal':
-            edge = Edge((-2, bisector[2]), (12, bisector[2]), p1, p2)
+    sorted_indices = np.argsort(points[:, 0])
+    sorted_points = points[sorted_indices]
+    
+    # Определяем вспомогательную функцию для рекурсивного поиска
+    def closest_pair_recursive(start, end):
+        if end - start <= 3:
+            # Для маленького количества точек используем метод перебора
+            local_min_dist = float('inf')
+            local_closest_pair = None
+            for i in range(start, end):
+                for j in range(i + 1, end):
+                    dist = euclidean_distance(sorted_points[i], sorted_points[j])
+                    if dist < local_min_dist:
+                        local_min_dist = dist
+                        local_closest_pair = (sorted_indices[i], sorted_indices[j])
+            return local_closest_pair, local_min_dist
+        
+        # Разделяем на две части
+        mid = (start + end) // 2
+        mid_x = sorted_points[mid][0]
+        
+        # Рекурсивно находим ближайшие пары в левой и правой частях
+        left_pair, left_dist = closest_pair_recursive(start, mid)
+        right_pair, right_dist = closest_pair_recursive(mid, end)
+        
+        # Определяем минимальное расстояние и соответствующую пару
+        if left_dist <= right_dist:
+            min_pair = left_pair
+            min_dist = left_dist
         else:
-            y1 = bisector[0] * (-2 - bisector[1]) + bisector[2]
-            y2 = bisector[0] * (12 - bisector[1]) + bisector[2]
-            edge = Edge((-2, y1), (12, y2), p1, p2)
-        edges.append(edge)
+            min_pair = right_pair
+            min_dist = right_dist
+        
+        # Находим точки в полосе шириной 2*min_dist вокруг средней линии
+        strip_indices = []
+        for i in range(start, end):
+            if abs(sorted_points[i][0] - mid_x) < min_dist:
+                strip_indices.append(i)
+        
+        # Сортируем точки в полосе по y-координате
+        strip_indices.sort(key=lambda i: sorted_points[i][1])
+        
+        # Проверяем пары в полосе
+        for i in range(len(strip_indices)):
+            for j in range(i + 1, min(i + 7, len(strip_indices))):  # Проверяем только ближайшие 6 точек
+                if sorted_points[strip_indices[j]][1] - sorted_points[strip_indices[i]][1] >= min_dist:
+                    break
+                
+                dist = euclidean_distance(sorted_points[strip_indices[i]], sorted_points[strip_indices[j]])
+                if dist < min_dist:
+                    min_dist = dist
+                    min_pair = (sorted_indices[strip_indices[i]], sorted_indices[strip_indices[j]])
+        
+        return min_pair, min_dist
+    
+    return closest_pair_recursive(0, len(sorted_points))
 
-    elif len(points) == 3:
-        p1, p2, p3 = points
-        bisector12 = perpendicular_bisector(p1, p2)
-        bisector23 = perpendicular_bisector(p2, p3)
-        bisector13 = perpendicular_bisector(p1, p3)
-
-        v = intersect_bisectors(bisector12, bisector23)
-        if v:
-            vertices.append(v)
-            # Обрезаем бисекторы до вершины
-            for p_pair, bisector in [((p1, p2), bisector12), ((p2, p3), bisector23), ((p1, p3), bisector13)]:
-                p1, p2 = p_pair
-                if bisector[3] == 'vertical':
-                    edge = Edge((bisector[0], v[1]), (bisector[0], -2 if p1[1] < v[1] else 12), p1, p2)
-                elif bisector[3] == 'horizontal':
-                    edge = Edge((v[0], bisector[2]), (-2 if p1[0] < v[0] else 12, bisector[2]), p1, p2)
-                else:
-                    y1 = bisector[0] * (-2 - bisector[1]) + bisector[2]
-                    y2 = bisector[0] * (12 - bisector[1]) + bisector[2]
-                    if (p1[0] + p2[0]) / 2 < v[0]:
-                        edge = Edge((v[0], v[1]), (-2, y1), p1, p2)
-                    else:
-                        edge = Edge((v[0], v[1]), (12, y2), p1, p2)
-                edges.append(edge)
-
-    return edges, vertices
-
-# Слияние двух диаграмм Вороного
-def merge_voronoi(left_edges, right_edges, left_vertices, right_vertices, left_points, right_points):
-    edges = left_edges + right_edges
-    vertices = left_vertices + right_vertices
-
-    # Находим ближайшую пару между левой и правой половинами
-    min_dist = float('inf')
-    closest_pair = None
-    for lp in left_points:
-        for rp in right_points:
-            dist = ((lp[0] - rp[0])**2 + (lp[1] - rp[1])**2)**0.5
-            if dist < min_dist:
-                min_dist = dist
-                closest_pair = (lp, rp)
-
-    # Строим бисектор для ближайшей пары
-    p1, p2 = closest_pair
-    bisector = perpendicular_bisector(p1, p2)
-    if bisector[3] == 'vertical':
-        edge = Edge((bisector[0], -2), (bisector[0], 12), p1, p2)
-    elif bisector[3] == 'horizontal':
-        edge = Edge((-2, bisector[2]), (12, bisector[2]), p1, p2)
-    else:
-        y1 = bisector[0] * (-2 - bisector[1]) + bisector[2]
-        y2 = bisector[0] * (12 - bisector[1]) + bisector[2]
-        edge = Edge((-2, y1), (12, y2), p1, p2)
-    edges.append(edge)
-
-    # Находим новые вершины (пересечения бисекторов)
-    for i, e1 in enumerate(edges):
-        for e2 in edges[i+1:]:
-            b1 = perpendicular_bisector(e1.left_point, e1.right_point)
-            b2 = perpendicular_bisector(e2.left_point, e2.right_point)
-            v = intersect_bisectors(b1, b2)
-            if v and v not in vertices:
-                vertices.append(v)
-
-    return edges, vertices
-
-# Обрезка рёбер до границ области или вершин
-def clip_edges(edges, bounds):
-    xmin, xmax, ymin, ymax = bounds
-    clipped_edges = []
-    vertices = set()
-
-    # Собираем все вершины (пересечения рёбер)
-    for i, e1 in enumerate(edges):
-        for e2 in edges[i+1:]:
-            b1 = perpendicular_bisector(e1.left_point, e1.right_point)
-            b2 = perpendicular_bisector(e2.left_point, e2.right_point)
-            v = intersect_bisectors(b1, b2)
-            if v:
-                vertices.add(v)
-
-    for edge in edges:
-        start, end = edge.start, edge.end
-        if not start or not end:
-            continue
-
-        # Находим ближайшие вершины к концам ребра
-        start_closest = min(vertices, key=lambda v: (v[0] - start[0])**2 + (v[1] - start[1])**2) if vertices else start
-        end_closest = min(vertices, key=lambda v: (v[0] - end[0])**2 + (v[1] - end[1])**2) if vertices else end
-
-        # Обрезаем до ближайших вершин или границ
-        new_start = start_closest if (xmin <= start_closest[0] <= xmax and ymin <= start_closest[1] <= ymax) else start
-        new_end = end_closest if (xmin <= end_closest[0] <= xmax and ymin <= end_closest[1] <= ymax) else end
-
-        # Проверяем, попадает ли ребро в область
-        if (xmin <= new_start[0] <= xmax and ymin <= new_start[1] <= ymax) or (xmin <= new_end[0] <= xmax and ymin <= new_end[1] <= ymax):
-            clipped_edges.append(Edge(new_start, new_end, edge.left_point, edge.right_point))
-
-    return clipped_edges
-
-# Нахождение ближайшей пары точек
-def closest_pair(voronoi_edges, points):
-    min_dist = float('inf')
-    closest_pair = None
-
-    for edge in voronoi_edges:
-        p1 = edge.left_point
-        p2 = edge.right_point
-        if p1 and p2:
-            dist = ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
-            if dist < min_dist:
-                min_dist = dist
-                closest_pair = (p1, p2)
-
+def plot_solution(points):
+    """
+    Строит две диаграммы: Вороного и Делоне на разных картинках
+    с использованием библиотеки scipy для более точных вычислений
+    """
+    # Ищем ближайшую пару точек
+    closest_pair, min_dist = find_closest_pair_divide_conquer(points)
+    
+    # Используем scipy для построения диаграммы Вороного
+    vor = Voronoi(points)
+    
+    # Используем scipy для построения триангуляции Делоне
+    tri = Delaunay(points)
+    
+    # Настройка параметров графиков
+    margin = 1.0
+    x_min, y_min = np.min(points, axis=0) - margin
+    x_max, y_max = np.max(points, axis=0) + margin
+    
+    # Диаграмма Вороного
+    fig1, ax1 = plt.subplots(figsize=(10, 8))
+    ax1.set_xlim(x_min, x_max)
+    ax1.set_ylim(y_min, y_max)
+    
+    # Рисуем точки
+    ax1.scatter(points[:, 0], points[:, 1], c='black', s=70, zorder=3)
+    
+    # Рисуем диаграмму Вороного с помощью scipy
+    voronoi_plot_2d(vor, ax=ax1, show_points=False, show_vertices=True,
+                  line_colors='purple', line_width=2, line_alpha=0.8,
+                  point_size=5)
+    
+    # Выделяем ближайшую пару точек на диаграмме Вороного
+    ax1.plot([points[closest_pair[0]][0], points[closest_pair[1]][0]],
+             [points[closest_pair[0]][1], points[closest_pair[1]][1]], 'lime', lw=3, zorder=4)
+    ax1.scatter(points[closest_pair, 0], points[closest_pair, 1], c='lime', s=120, zorder=5)
+    
+    # Подписываем точки
+    for i, point in enumerate(points):
+        ax1.annotate(f"P{i+1}", (point[0]+0.1, point[1]+0.1), fontsize=10)
+    
+    ax1.set_title('Диаграмма Вороного')
+    ax1.grid(True)
+    ax1.set_aspect('equal')
+    
+    # Триангуляция Делоне
+    fig2, ax2 = plt.subplots(figsize=(10, 8))
+    ax2.set_xlim(x_min, x_max)
+    ax2.set_ylim(y_min, y_max)
+    
+    # Рисуем точки
+    ax2.scatter(points[:, 0], points[:, 1], c='black', s=70, zorder=3)
+    
+    # Рисуем триангуляцию Делоне
+    for simplex in tri.simplices:
+        # Рисуем каждый треугольник
+        for i in range(3):
+            j = (i + 1) % 3
+            ax2.plot([points[simplex[i], 0], points[simplex[j], 0]],
+                    [points[simplex[i], 1], points[simplex[j], 1]], 'orange', lw=2, zorder=1)
+    
+    # Проверяем, что триангуляция образует выпуклую оболочку
+    # Получаем выпуклую оболочку точек
+    hull = tri.convex_hull
+    for simplex in hull:
+        ax2.plot([points[simplex[0], 0], points[simplex[1], 0]],
+                [points[simplex[0], 1], points[simplex[1], 1]], 'orange', lw=3, zorder=2)
+    
+    # Выделяем ближайшую пару точек на триангуляции Делоне
+    ax2.plot([points[closest_pair[0]][0], points[closest_pair[1]][0]],
+             [points[closest_pair[0]][1], points[closest_pair[1]][1]], 'lime', lw=3, zorder=4)
+    ax2.scatter(points[closest_pair, 0], points[closest_pair, 1], c='lime', s=120, zorder=5)
+    
+    # Подписываем точки
+    for i, point in enumerate(points):
+        ax2.annotate(f"P{i+1}", (point[0]+0.1, point[1]+0.1), fontsize=10)
+    
+    ax2.set_title('Триангуляция Делоне')
+    ax2.grid(True)
+    ax2.set_aspect('equal')
+    
+    plt.tight_layout()
+    plt.show()
+    
     return closest_pair, min_dist
 
-# Построение триангуляции Делоне
-def delaunay_triangulation(voronoi_edges, points):
-    delaunay_edges = set()
-    for edge in voronoi_edges:
-        p1 = edge.left_point
-        p2 = edge.right_point
-        if p1 and p2:
-            delaunay_edges.add((min(p1, p2), max(p1, p2)))
-
-    # Формируем граф соседства
-    adj = defaultdict(set)
-    for p1, p2 in delaunay_edges:
-        adj[p1].add(p2)
-        adj[p2].add(p1)
-
-    # Формируем треугольники
-    triangles = []
-    for p1 in points:
-        neighbors = sorted(list(adj[p1]), key=lambda p: (p[0] - p1[0], p[1] - p1[1]))
-        for i in range(len(neighbors)):
-            for j in range(i + 1, len(neighbors)):
-                p2, p3 = neighbors[i], neighbors[j]
-                if p3 in adj[p2]:  # Проверяем, замкнут ли треугольник
-                    triangle = tuple(sorted([p1, p2, p3]))
-                    if triangle not in triangles:
-                        triangles.append(triangle)
-
-    return list(delaunay_edges), triangles
-
-# Визуализация
-def visualize(points, voronoi_edges, closest_pair, delaunay_edges, delaunay_triangles):
-    plt.figure(figsize=(10, 10))
-
-    # 1. Рисуем точки
-    x, y = zip(*points)
-    plt.scatter(x, y, color='blue', label='Points', zorder=3)
-    for i, (px, py) in enumerate(points):
-        plt.text(px + 0.3, py, f"P{i+1}", fontsize=12, zorder=4)
-
-    # 2. Рисуем диаграмму Вороного
-    for edge in voronoi_edges:
-        if edge.start and edge.end:
-            plt.plot([edge.start[0], edge.end[0]], [edge.start[1], edge.end[1]], 'g--', label='Voronoi Edges' if 'Voronoi Edges' not in plt.gca().get_legend_handles_labels()[1] else "")
-
-    # 3. Рисуем треугольники Делоне
-    for triangle in delaunay_triangles:
-        p1, p2, p3 = triangle
-        x = [p1[0], p2[0], p3[0], p1[0]]
-        y = [p1[1], p2[1], p3[1], p1[1]]
-        plt.fill(x, y, 'cyan', alpha=0.3, label='Delaunay Triangles' if 'Delaunay Triangles' not in plt.gca().get_legend_handles_labels()[1] else "")
-
-    # 4. Рисуем рёбра Делоне
-    for p1, p2 in delaunay_edges:
-        plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'b-', label='Delaunay Edges' if 'Delaunay Edges' not in plt.gca().get_legend_handles_labels()[1] else "")
-
-    # 5. Выделяем ближайшую пару
-    if closest_pair:
-        p1, p2 = closest_pair
-        plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'r-', linewidth=2, label='Closest Pair')
-
-    plt.xlim(-2, 12)
-    plt.ylim(-2, 12)
-    plt.grid(True)
-    plt.legend()
-    plt.title("Voronoi Diagram, Closest Pair, and Delaunay Triangulation")
-    plt.savefig("voronoi_diagram.png")
-
-# Основная программа
+# Основная функция
 def main():
-    # Построение диаграммы Вороного
-    voronoi_edges, voronoi_vertices = voronoi_diagram(points)
-
-    # Нахождение ближайшей пары
-    pair, distance = closest_pair(voronoi_edges, points)
-    print("Ближайшая пара точек:", pair, "Расстояние:", distance)
-
-    # Построение триангуляции Делоне
-    delaunay_edges, delaunay_triangles = delaunay_triangulation(voronoi_edges, points)
-    print("Триангуляция Делоне (треугольники):", delaunay_triangles)
-
-    # Визуализация
-    visualize(points, voronoi_edges, pair, delaunay_edges, delaunay_triangles)
+    # Генерируем случайные точки
+    random.seed()  # Использование текущего времени для инициализации генератора случайных чисел
+    num_points = 10
+    points = np.random.rand(num_points, 2) * 10  # Точки в диапазоне от 0 до 10
+    
+    # Выполняем расчеты и визуализацию
+    closest_pair, min_dist = plot_solution(points)
+    
+    # Выводим информацию о точках
+    print(f"Множество точек E:")
+    for i, point in enumerate(points):
+        print(f"P{i+1}: ({point[0]:.4f}, {point[1]:.4f})")
+    
+    print(f"\nБлижайшая пара точек: P{closest_pair[0]+1} и P{closest_pair[1]+1}")
+    print(f"Расстояние между ними: {min_dist:.4f}")
 
 if __name__ == "__main__":
     main()
